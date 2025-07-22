@@ -1,6 +1,7 @@
 import numpy as np
 import pickle
 from collections import defaultdict
+from tictactoe_env import Player  # Add this import
 
 class TDAgent:
     def __init__(self, alpha=0.5, gamma=0.9, epsilon=0.1):
@@ -23,7 +24,7 @@ class TDAgent:
         for action in available_actions:
             next_state = state.copy()
             row, col = action // 3, action % 3
-            next_state[row, col] = Player.X.value  # Agent plays X
+            next_state[row, col] = Player.X.value  # Now properly referenced
             
             next_state_key = self.get_state_key(next_state)
             value = self.state_values.get(next_state_key, 0)
