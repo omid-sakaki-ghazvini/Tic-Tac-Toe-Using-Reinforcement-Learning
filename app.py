@@ -1,13 +1,10 @@
 import streamlit as st
-from enum import Enum
+from tictactoe_env import TicTacToeEnv, Player
+from td_learning_agent import TDAgent
+import numpy as np
+import pickle
 
-# Define the Player enum
-class Player(Enum):
-    EMPTY = 0
-    X = 1
-    O = 2
-
-# Initialize session state if not present
+# Initialize session state
 if "board" not in st.session_state:
     st.session_state.board = [[Player.EMPTY.value for _ in range(3)] for _ in range(3)]
 if "current_player" not in st.session_state:
@@ -16,58 +13,47 @@ if "game_over" not in st.session_state:
     st.session_state.game_over = False
 if "winner" not in st.session_state:
     st.session_state.winner = None
+if "agent" not in st.session_state:
+    try:
+        with open('trained_agent.pkl', 'rb') as f:
+            st.session_state.agent = pickle.load(f)
+    except FileNotFoundError:
+        st.session_state.agent = TDAgent(player=Player.O.value)  # Agent plays as O
 
-# Function to handle button click
-def handle_click(i, j):
+# Function to handle human move
+def handle_human_move(i, j):
     if not st.session_state.game_over and st.session_state.board[i][j] == Player.EMPTY.value:
         st.session_state.board[i][j] = st.session_state.current_player
         check_winner()
         if not st.session_state.game_over:
-            st.session_state.current_player = Player.O.value if st.session_state.current_player == Player.X.value else Player.X.value
+            st.session_state.current_player = Player.O.value
+            agent_move()
+        st.rerun()
+
+# Function to handle agent move
+def agent_move():
+    env = TicTacToeEnv()
+    env.board = np.array(st.session_state.board)
+    available_actions = env.get_available_actions()
+    if available_actions:
+        action = st.session_state.agent.choose_action(env.board, available_actions)
+        row, col = action // 3, action % 3
+        st.session_state.board[row][col] = Player.O.value
+        check_winner()
         st.rerun()
 
 # Function to check for a winner
 def check_winner():
-    board = st.session_state.board
-    # Check rows
-    for row in board:
-        if row == [Player.X.value, Player.X.value, Player.X.value]:
+    board = np.array(st.session_state.board)
+    for player in [Player.X.value, Player.O.value]:
+        if (np.all(board == player, axis=1).any() or
+            np.all(board == player, axis=0).any() or
+            np.all(np.diag(board) == player) or
+            np.all(np.diag(np.fliplr(board)) == player)):
             st.session_state.game_over = True
-            st.session_state.winner = Player.X.value
+            st.session_state.winner = player
             return
-        if row == [Player.O.value, Player.O.value, Player.O.value]:
-            st.session_state.game_over = True
-            st.session_state.winner = Player.O.value
-            return
-    # Check columns
-    for col in range(3):
-        if [board[row][col] for row in range(3)] == [Player.X.value, Player.X.value, Player.X.value]:
-            st.session_state.game_over = True
-            st.session_state.winner = Player.X.value
-            return
-        if [board[row][col] for row in range(3)] == [Player.O.value, Player.O.value, Player.O.value]:
-            st.session_state.game_over = True
-            st.session_state.winner = Player.O.value
-            return
-    # Check diagonals
-    if [board[i][i] for i in range(3)] == [Player.X.value, Player.X.value, Player.X.value]:
-        st.session_state.game_over = True
-        st.session_state.winner = Player.X.value
-        return
-    if [board[i][i] for i in range(3)] == [Player.O.value, Player.O.value, Player.O.value]:
-        st.session_state.game_over = True
-        st.session_state.winner = Player.O.value
-        return
-    if [board[i][2-i] for i in range(3)] == [Player.X.value, Player.X.value, Player.X.value]:
-        st.session_state.game_over = True
-        st.session_state.winner = Player.X.value
-        return
-    if [board[i][2-i] for i in range(3)] == [Player.O.value, Player.O.value, Player.O.value]:
-        st.session_state.game_over = True
-        st.session_state.winner = Player.O.value
-        return
-    # Check for draw
-    if all(cell != Player.EMPTY.value for row in board for cell in row):
+    if np.all(board != Player.EMPTY.value):
         st.session_state.game_over = True
         st.session_state.winner = None
 
@@ -82,7 +68,7 @@ def display_board():
                 display_text = " " if cell_value == Player.EMPTY.value else ("X" if cell_value == Player.X.value else "O")
                 disabled = cell_value != Player.EMPTY.value or st.session_state.game_over
                 if st.button(display_text, key=f"cell_{i}_{j}", disabled=disabled):
-                    handle_click(i, j)
+                    handle_human_move(i, j)
 
 # Function to show game status
 def show_status():
@@ -96,18 +82,26 @@ def show_status():
 
 # Main app
 st.title("🎮 Tic-Tac-Toe AI")
+st.write("Play against an AI trained with Reinforcement Learning!")
 display_board()
 show_status()
 st.markdown("---")
 
 # Reset button
 if st.button("Reset Game"):
-    if "board" in st.session_state:
-        del st.session_state.board
-    if "current_player" in st.session_state:
-        del st.session_state.current_player
-    if "game_over" in st.session_state:
-        del st.session_state.game_over
-    if "winner" in st.session_state:
-        del st.session_state.winner
+    for key in ["board", "current_player", "game_over", "winner"]:
+        if key in st.session_state:
+            del st.session_state[key]
+    st.rerun()
+
+# Train or load agent button (optional)
+if st.button("Train New Agent"):
+    from train_agent import train_agent
+    env = TicTacToeEnv()
+    agent = TDAgent(player=Player.O.value)
+    train_agent(env, agent, episodes=10000)
+    st.session_state.agent = agent
+    with open('trained_agent.pkl', 'wb') as f:
+        pickle.dump(agent, f)
+    st.success("Agent trained and saved!")
     st.rerun()
