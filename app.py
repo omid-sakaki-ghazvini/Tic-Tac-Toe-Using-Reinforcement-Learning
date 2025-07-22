@@ -1,108 +1,102 @@
-# -*- coding: utf-8 -*-
 import streamlit as st
+import numpy as np
 from tictactoe_env import TicTacToeEnv, Player
 from td_learning_agent import TDAgent
-import numpy as np
 import pickle
 
-# Initialize session state
-if "board" not in st.session_state:
-    st.session_state.board = [[Player.EMPTY.value for _ in range(3)] for _ in range(3)]
-if "current_player" not in st.session_state:
-    st.session_state.current_player = Player.X.value
-if "game_over" not in st.session_state:
-    st.session_state.game_over = False
-if "winner" not in st.session_state:
-    st.session_state.winner = None
-if "agent" not in st.session_state:
+# Custom CSS for styling
+st.markdown("""
+<style>
+    .big-button {
+        height: 100px !important;
+        width: 100px !important;
+        font-size: 40px !important;
+    }
+    .stButton>button {
+        width: 100% !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# Initialize game
+if 'env' not in st.session_state:
+    st.session_state.env = TicTacToeEnv()
+    st.session_state.env.reset()
+    st.session_state.agent = TDAgent(alpha=0.5, gamma=0.9, epsilon=0.1)
+    
+    # Load or train agent
     try:
-        with open('trained_agent.pkl', 'rb') as f:
-            st.session_state.agent = pickle.load(f)
-    except FileNotFoundError:
-        st.session_state.agent = TDAgent(player=Player.O.value)
-
-# Function to handle human move
-def handle_human_move(i, j):
-    if not st.session_state.game_over and st.session_state.board[i][j] == Player.EMPTY.value:
-        st.session_state.board[i][j] = st.session_state.current_player
-        check_winner()
-        if not st.session_state.game_over:
-            st.session_state.current_player = Player.O.value
-            agent_move()
-        st.rerun()
-
-# Function to handle agent move
-def agent_move():
-    env = TicTacToeEnv()
-    env.board = np.array(st.session_state.board)
-    available_actions = env.get_available_actions()
-    if available_actions:
-        action = st.session_state.agent.choose_action(env.board, available_actions)
-        row, col = divmod(action, 3)
-        st.session_state.board[row][col] = Player.O.value
-        check_winner()
-        st.rerun()
-
-# Function to check for a winner
-def check_winner():
-    board = np.array(st.session_state.board)
-    for player in [Player.X.value, Player.O.value]:
-        if (np.all(board == player, axis=1).any() or
-            np.all(board == player, axis=0).any() or
-            np.all(np.diag(board) == player) or
-            np.all(np.diag(np.fliplr(board)) == player)):
-            st.session_state.game_over = True
-            st.session_state.winner = player
-            return
-    if np.all(board != Player.EMPTY.value):
-        st.session_state.game_over = True
-        st.session_state.winner = None
-
-# Function to display the game board
-def display_board():
-    board = st.session_state.board
-    cols = st.columns(3)
-    for i in range(3):
-        with cols[i]:
-            for j in range(3):
-                cell_value = board[i][j]
-                display_text = " " if cell_value == Player.EMPTY.value else ("X" if cell_value == Player.X.value else "O")
-                disabled = cell_value != Player.EMPTY.value or st.session_state.game_over
-                if st.button(display_text, key=f"cell_{i}_{j}", disabled=disabled):
-                    handle_human_move(i, j)
-
-# Function to show game status
-def show_status():
-    if st.session_state.game_over:
-        if st.session_state.winner is not None:
-            st.success(f"Player {'X' if st.session_state.winner == Player.X.value else 'O'} wins!")
-        else:
-            st.info("It's a draw!")
-    else:
-        st.info(f"Current turn: {'X' if st.session_state.current_player == Player.X.value else 'O'}")
+        st.session_state.agent.load('tictactoe_agent.pkl')
+    except:
+        # Train with reduced episodes for Streamlit
+        for _ in range(500):
+            state = st.session_state.env.reset()
+            done = False
+            while not done:
+                available_actions = st.session_state.env.get_available_actions()
+                if st.session_state.env.current_player == Player.X.value:
+                    action = st.session_state.agent.choose_action(state, available_actions)
+                else:
+                    action = np.random.choice(available_actions)
+                next_state, _, done, _ = st.session_state.env.step(action)
+                if st.session_state.env.current_player == Player.X.value:
+                    reward = 1 if st.session_state.env.winner == Player.X.value else -1 if st.session_state.env.winner == Player.O.value else 0
+                    st.session_state.agent.update(state, reward, next_state, done)
+                state = next_state
+        st.session_state.agent.save('tictactoe_agent.pkl')
 
 # Main app
 st.title("🎮 Tic-Tac-Toe AI")
-st.write("Play against an AI trained with Reinforcement Learning!")
-display_board()
-show_status()
+st.markdown("Play against an AI trained with Reinforcement Learning")
+
+# Game board
+cols = st.columns(3)
+for i in range(3):
+    for j in range(3):
+        with cols[j]:
+            cell_value = st.session_state.env.board[i, j]
+            display_text = " " if cell_value == Player.EMPTY.value else "❌" if cell_value == Player.X.value else "⭕"
+            
+            if st.button(
+                display_text,
+                key=f"cell_{i}_{j}",
+                disabled=(cell_value != Player.EMPTY.value or st.session_state.env.done),
+                help="Make your move" if cell_value == Player.EMPTY.value else None
+            ):
+                # Human move (O)
+                action = i * 3 + j
+                st.session_state.env.step(action)
+                
+                # AI move (X) if game continues
+                if not st.session_state.env.done:
+                    available_actions = st.session_state.env.get_available_actions()
+                    action = st.session_state.agent.choose_action(st.session_state.env.board, available_actions)
+                    st.session_state.env.step(action)
+                
+                st.rerun()
+
+# Game status
+if st.session_state.env.done:
+    if st.session_state.env.winner == Player.X.value:
+        st.error("🤖 AI (❌) wins!")
+    elif st.session_state.env.winner == Player.O.value:
+        st.success("🎉 You (⭕) win!")
+    else:
+        st.info("🤝 It's a draw!")
+    
+    if st.button("New Game"):
+        st.session_state.env.reset()
+        st.rerun()
+else:
+    current_player = "🤖 AI (❌)" if st.session_state.env.current_player == Player.X.value else "You (⭕)"
+    st.write(f"Current turn: {current_player}")
+
+# Instructions
 st.markdown("---")
-
-# Reset button
-if st.button("Reset Game"):
-    for key in ["board", "current_player", "game_over", "winner"]:
-        if key in st.session_state:
-            del st.session_state[key]
-    st.rerun()
-
-# Train or load agent button
-if st.button("Train New Agent"):
-    from train_agent import train_agent
-    env = TicTacToeEnv()
-    agent = TDAgent(player=Player.O.value)
-    train_agent(env, agent, episodes=10000)
-    st.session_state.agent = agent
-    with open('trained_agent.pkl', 'wb') as f:
-        pickle.dump(agent, f)
-    st.success("Agent trained and saved!")
-    st.rerun()
+st.markdown("""
+### How to play:
+1. You play as ⭕ (O)
+2. AI plays as ❌ (X)
+3. Click any empty cell to make your move
+4. The AI will respond automatically
+""")
