@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import streamlit as st
 from tictactoe_env import TicTacToeEnv, Player
 from td_learning_agent import TDAgent
@@ -37,7 +38,7 @@ def agent_move():
     available_actions = env.get_available_actions()
     if available_actions:
         action = st.session_state.agent.choose_action(env.board, available_actions)
-        row, col = action // 3, action % 3
+        row, col = divmod(action, 3)
         st.session_state.board[row][col] = Player.O.value
         check_winner()
         st.rerun()
@@ -94,7 +95,7 @@ if st.button("Reset Game"):
             del st.session_state[key]
     st.rerun()
 
-# Train or load agent button (optional)
+# Train or load agent button
 if st.button("Train New Agent"):
     from train_agent import train_agent
     env = TicTacToeEnv()
