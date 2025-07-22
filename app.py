@@ -4,6 +4,18 @@ from tictactoe_env import TicTacToeEnv, Player
 from td_learning_agent import TDAgent
 import pickle
 
+# Custom CSS for button styling
+st.markdown("""
+<style>
+    .big-button {
+        width: 100px !important;
+        height: 100px !important;
+        font-size: 40px !important;
+        margin: 5px !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # Initialize game and agent
 if 'env' not in st.session_state:
     st.session_state.env = TicTacToeEnv()
@@ -34,7 +46,7 @@ if 'env' not in st.session_state:
 st.title("🎮 Tic-Tac-Toe AI")
 st.markdown("Play against an AI trained with Reinforcement Learning")
 
-# Display board using a simplified approach
+# Display board
 cols = st.columns(3)
 for i in range(3):
     for j in range(3):
@@ -42,13 +54,14 @@ for i in range(3):
             cell_value = st.session_state.env.board[i, j]
             display_text = " " if cell_value == Player.EMPTY.value else "❌" if cell_value == Player.X.value else "⭕"
             
-            if st.button(
+            st.button(
                 display_text,
                 key=f"cell_{i}_{j}",
                 disabled=(cell_value != Player.EMPTY.value or st.session_state.env.done),
-                on_click=lambda i=i, j=j: handle_click(i, j)
-            ):
-                pass
+                on_click=lambda i=i, j=j: handle_click(i, j),
+                help="Click to make your move" if cell_value == Player.EMPTY.value else None,
+                kwargs={"i": i, "j": j}
+            )
 
 def handle_click(i, j):
     if not st.session_state.env.done and st.session_state.env.current_player == Player.O.value:
@@ -62,7 +75,6 @@ def handle_click(i, j):
             action = st.session_state.agent.choose_action(st.session_state.env.board, available_actions)
             st.session_state.env.step(action)
         
-        # Rerun to update the display
         st.experimental_rerun()
 
 # Game status
