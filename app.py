@@ -1,104 +1,113 @@
 import streamlit as st
-import numpy as np
-from tictactoe_env import TicTacToeEnv, Player
-from td_learning_agent import TDAgent
-import pickle
+from enum import Enum
 
-# Custom CSS for button styling
-st.markdown("""
-<style>
-    .big-button {
-        width: 100px !important;
-        height: 100px !important;
-        font-size: 40px !important;
-        margin: 5px !important;
-    }
-</style>
-""", unsafe_allow_html=True)
+# Define the Player enum
+class Player(Enum):
+    EMPTY = 0
+    X = 1
+    O = 2
 
-# Initialize game and agent
-if 'env' not in st.session_state:
-    st.session_state.env = TicTacToeEnv()
-    st.session_state.env.reset()
-    st.session_state.agent = TDAgent(alpha=0.5, gamma=0.9, epsilon=0.1)
-    
-    # Quick training if no saved model
-    try:
-        st.session_state.agent.load('tictactoe_agent.pkl')
-    except:
-        for _ in range(500):
-            state = st.session_state.env.reset()
-            done = False
-            while not done:
-                available_actions = st.session_state.env.get_available_actions()
-                if st.session_state.env.current_player == Player.X.value:
-                    action = st.session_state.agent.choose_action(state, available_actions)
-                else:
-                    action = np.random.choice(available_actions)
-                next_state, _, done, _ = st.session_state.env.step(action)
-                if st.session_state.env.current_player == Player.X.value:
-                    reward = 1 if st.session_state.env.winner == Player.X.value else -1 if st.session_state.env.winner == Player.O.value else 0
-                    st.session_state.agent.update(state, reward, next_state, done)
-                state = next_state
-        st.session_state.agent.save('tictactoe_agent.pkl')
+# Initialize session state if not present
+if "board" not in st.session_state:
+    st.session_state.board = [[Player.EMPTY.value for _ in range(3)] for _ in range(3)]
+if "current_player" not in st.session_state:
+    st.session_state.current_player = Player.X.value
+if "game_over" not in st.session_state:
+    st.session_state.game_over = False
+if "winner" not in st.session_state:
+    st.session_state.winner = None
+
+# Function to handle button click
+def handle_click(i, j):
+    if not st.session_state.game_over and st.session_state.board[i][j] == Player.EMPTY.value:
+        st.session_state.board[i][j] = st.session_state.current_player
+        check_winner()
+        if not st.session_state.game_over:
+            st.session_state.current_player = Player.O.value if st.session_state.current_player == Player.X.value else Player.X.value
+        st.rerun()
+
+# Function to check for a winner
+def check_winner():
+    board = st.session_state.board
+    # Check rows
+    for row in board:
+        if row == [Player.X.value, Player.X.value, Player.X.value]:
+            st.session_state.game_over = True
+            st.session_state.winner = Player.X.value
+            return
+        if row == [Player.O.value, Player.O.value, Player.O.value]:
+            st.session_state.game_over = True
+            st.session_state.winner = Player.O.value
+            return
+    # Check columns
+    for col in range(3):
+        if [board[row][col] for row in range(3)] == [Player.X.value, Player.X.value, Player.X.value]:
+            st.session_state.game_over = True
+            st.session_state.winner = Player.X.value
+            return
+        if [board[row][col] for row in range(3)] == [Player.O.value, Player.O.value, Player.O.value]:
+            st.session_state.game_over = True
+            st.session_state.winner = Player.O.value
+            return
+    # Check diagonals
+    if [board[i][i] for i in range(3)] == [Player.X.value, Player.X.value, Player.X.value]:
+        st.session_state.game_over = True
+        st.session_state.winner = Player.X.value
+        return
+    if [board[i][i] for i in range(3)] == [Player.O.value, Player.O.value, Player.O.value]:
+        st.session_state.game_over = True
+        st.session_state.winner = Player.O.value
+        return
+    if [board[i][2-i] for i in range(3)] == [Player.X.value, Player.X.value, Player.X.value]:
+        st.session_state.game_over = True
+        st.session_state.winner = Player.X.value
+        return
+    if [board[i][2-i] for i in range(3)] == [Player.O.value, Player.O.value, Player.O.value]:
+        st.session_state.game_over = True
+        st.session_state.winner = Player.O.value
+        return
+    # Check for draw
+    if all(cell != Player.EMPTY.value for row in board for cell in row):
+        st.session_state.game_over = True
+        st.session_state.winner = None
+
+# Function to display the game board
+def display_board():
+    board = st.session_state.board
+    cols = st.columns(3)
+    for i in range(3):
+        with cols[i]:
+            for j in range(3):
+                cell_value = board[i][j]
+                display_text = " " if cell_value == Player.EMPTY.value else ("X" if cell_value == Player.X.value else "O")
+                disabled = cell_value != Player.EMPTY.value or st.session_state.game_over
+                if st.button(display_text, key=f"cell_{i}_{j}", disabled=disabled):
+                    handle_click(i, j)
+
+# Function to show game status
+def show_status():
+    if st.session_state.game_over:
+        if st.session_state.winner is not None:
+            st.success(f"Player {'X' if st.session_state.winner == Player.X.value else 'O'} wins!")
+        else:
+            st.info("It's a draw!")
+    else:
+        st.info(f"Current turn: {'X' if st.session_state.current_player == Player.X.value else 'O'}")
 
 # Main app
 st.title("🎮 Tic-Tac-Toe AI")
-st.markdown("Play against an AI trained with Reinforcement Learning")
-
-# Display board
-cols = st.columns(3)
-for i in range(3):
-    for j in range(3):
-        with cols[j]:
-            cell_value = st.session_state.env.board[i, j]
-            display_text = " " if cell_value == Player.EMPTY.value else "❌" if cell_value == Player.X.value else "⭕"
-            
-            st.button(
-                display_text,
-                key=f"cell_{i}_{j}",
-                disabled=(cell_value != Player.EMPTY.value or st.session_state.env.done),
-                on_click=lambda i=i, j=j: handle_click(i, j),
-                help="Click to make your move" if cell_value == Player.EMPTY.value else None,
-                kwargs={"i": i, "j": j}
-            )
-
-def handle_click(i, j):
-    if not st.session_state.env.done and st.session_state.env.current_player == Player.O.value:
-        # Human move (O)
-        action = i * 3 + j
-        st.session_state.env.step(action)
-        
-        # AI move (X) if game continues
-        if not st.session_state.env.done:
-            available_actions = st.session_state.env.get_available_actions()
-            action = st.session_state.agent.choose_action(st.session_state.env.board, available_actions)
-            st.session_state.env.step(action)
-        
-        st.experimental_rerun()
-
-# Game status
-if st.session_state.env.done:
-    if st.session_state.env.winner == Player.X.value:
-        st.error("🤖 AI (❌) wins!")
-    elif st.session_state.env.winner == Player.O.value:
-        st.success("🎉 You (⭕) win!")
-    else:
-        st.info("🤝 It's a draw!")
-    
-    if st.button("New Game"):
-        st.session_state.env.reset()
-        st.experimental_rerun()
-else:
-    current_player = "🤖 AI (❌)" if st.session_state.env.current_player == Player.X.value else "You (⭕)"
-    st.write(f"Current turn: {current_player}")
-
-# Instructions
+display_board()
+show_status()
 st.markdown("---")
-st.markdown("""
-### How to play:
-1. You play as ⭕ (O)
-2. AI plays as ❌ (X)
-3. Click any empty cell to make your move
-4. The AI will respond automatically
-""")
+
+# Reset button
+if st.button("Reset Game"):
+    if "board" in st.session_state:
+        del st.session_state.board
+    if "current_player" in st.session_state:
+        del st.session_state.current_player
+    if "game_over" in st.session_state:
+        del st.session_state.game_over
+    if "winner" in st.session_state:
+        del st.session_state.winner
+    st.rerun()
