@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import numpy as np
 import gym
 from gym import spaces
@@ -36,7 +37,7 @@ class TicTacToeEnv(gym.Env):
         if self.done:
             return self.board.copy(), 0, True, {}
 
-        row, col = action // self.board_size, action % self.board_size
+        row, col = divmod(action, self.board_size)
         if self.board[row, col] != Player.EMPTY.value:
             return self.board.copy(), self.invalid_move_penalty, True, {}
 
@@ -68,7 +69,7 @@ class TicTacToeEnv(gym.Env):
         return np.all(self.board != Player.EMPTY.value)
 
     def get_available_actions(self):
-        return [i for i in range(9) if self.board[i // 3, i % 3] == Player.EMPTY.value]
+        return [i for i in range(self.board_size ** 2) if self.board[i // self.board_size, i % self.board_size] == Player.EMPTY.value]
 
     def render(self, mode='human'):
         if mode == 'human':
