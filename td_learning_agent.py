@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import numpy as np
 import pickle
 from collections import defaultdict
@@ -14,12 +15,12 @@ class TDAgent:
         self.state_action_counts = defaultdict(int)
 
     def get_canonical_state(self, state):
-        min_state = state
+        min_state = state.copy()  # Ensure a copy to avoid modifying the original
         for _ in range(3):  # Rotate 0, 90, 180, 270 degrees
-            rotated = np.rot90(state)
+            rotated = np.rot90(min_state)
             flipped = np.fliplr(rotated)
-            min_state = min(min_state.flatten(), rotated.flatten(), flipped.flatten())
-            state = rotated
+            min_state = min(min_state.flatten(), rotated.flatten(), flipped.flatten(), key=str)
+            min_state = rotated  # Update for next iteration
         return str(min_state)
 
     def choose_action(self, state, available_actions):
@@ -30,23 +31,23 @@ class TDAgent:
         best_action = None
         for action in available_actions:
             next_state = state.copy()
-            row, col = action // 3, action % 3
+            row, col = divmod(action, 3)  # Use divmod for clarity
             next_state[row, col] = self.player
             next_state_key = self.get_canonical_state(next_state)
-            value = self.state_values.get(next_state_key, 0)
+            value = self.state_values.get(next_state_key, 0.0)  # Ensure float
             if value > max_value:
                 max_value = value
                 best_action = action
-        return best_action if best_action is not None else max(available_actions, key=lambda a: self.state_action_counts.get(self.get_canonical_state(state.copy().flatten()[a // 3, a % 3] = self.player), 0))
+        return best_action if best_action is not None else max(available_actions, key=lambda a: self.state_action_counts.get(self.get_canonical_state(state.copy().flatten()[divmod(a, 3)] = self.player), 0))
 
     def update(self, state, reward, next_state, done):
         state_key = self.get_canonical_state(state)
         next_state_key = self.get_canonical_state(next_state)
-        current_value = self.state_values.get(state_key, 0)
-        next_value = self.state_values.get(next_state_key, 0) if not done else 0
+        current_value = self.state_values.get(state_key, 0.0)
+        next_value = self.state_values.get(next_state_key, 0.0) if not done else 0.0
         td_target = reward + self.gamma * next_value
         td_error = td_target - current_value
-        self.state_values[state_key] = current_value + self.alpha * td_error
+        self.state_values[state_key] += self.alpha * td_error
         self.state_action_counts[state_key] += 1
 
     def decay_epsilon(self):
