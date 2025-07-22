@@ -5,22 +5,22 @@ from collections import defaultdict
 
 class TDAgent:
     def __init__(self, alpha=0.5, gamma=0.9, epsilon=0.1, epsilon_min=0.01, epsilon_decay=0.995, player=1):
-        self.alpha = alpha  # Learning rate
-        self.gamma = gamma  # Discount factor
-        self.epsilon = epsilon  # Exploration rate
+        self.alpha = alpha
+        self.gamma = gamma
+        self.epsilon = epsilon
         self.epsilon_min = epsilon_min
         self.epsilon_decay = epsilon_decay
-        self.player = player  # 1 for X, 2 for O
+        self.player = player
         self.state_values = defaultdict(float)
         self.state_action_counts = defaultdict(int)
 
     def get_canonical_state(self, state):
-        min_state = state.copy()  # Ensure a copy to avoid modifying the original
-        for _ in range(3):  # Rotate 0, 90, 180, 270 degrees
+        min_state = state.copy()
+        for _ in range(3):
             rotated = np.rot90(min_state)
             flipped = np.fliplr(rotated)
             min_state = min(min_state.flatten(), rotated.flatten(), flipped.flatten(), key=str)
-            min_state = rotated  # Update for next iteration
+            min_state = rotated
         return str(min_state)
 
     def choose_action(self, state, available_actions):
@@ -31,10 +31,10 @@ class TDAgent:
         best_action = None
         for action in available_actions:
             next_state = state.copy()
-            row, col = divmod(action, 3)  # Use divmod for clarity
+            row, col = divmod(action, 3)
             next_state[row, col] = self.player
             next_state_key = self.get_canonical_state(next_state)
-            value = self.state_values.get(next_state_key, 0.0)  # Ensure float
+            value = self.state_values.get(next_state_key, 0.0)
             if value > max_value:
                 max_value = value
                 best_action = action
@@ -58,12 +58,7 @@ class TDAgent:
             with open(filename, 'wb') as f:
                 pickle.dump({
                     'state_values': dict(self.state_values),
-                    'params': {
-                        'alpha': self.alpha,
-                        'gamma': self.gamma,
-                        'epsilon': self.epsilon,
-                        'player': self.player
-                    }
+                    'params': {'alpha': self.alpha, 'gamma': self.gamma, 'epsilon': self.epsilon, 'player': self.player}
                 }, f)
         except Exception as e:
             print(f"Error saving model: {e}")
