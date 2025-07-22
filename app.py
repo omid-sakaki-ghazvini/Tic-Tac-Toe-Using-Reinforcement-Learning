@@ -18,7 +18,7 @@ if "agent" not in st.session_state:
         with open('trained_agent.pkl', 'rb') as f:
             st.session_state.agent = pickle.load(f)
     except FileNotFoundError:
-        st.session_state.agent = TDAgent(player=Player.O.value)  # Agent plays as O
+        st.session_state.agent = TDAgent(player=Player.O.value)
 
 # Function to handle human move
 def handle_human_move(i, j):
