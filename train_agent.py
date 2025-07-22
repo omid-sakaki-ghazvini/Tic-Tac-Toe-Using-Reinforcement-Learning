@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import numpy as np
 from tictactoe_env import TicTacToeEnv
 from td_learning_agent import TDAgent
@@ -14,7 +15,7 @@ def train_agent(env, agent, episodes=10000):
             state = next_state
         agent.decay_epsilon()
         if episode % 1000 == 0:
-            print(f"Episode {episode}, Epsilon: {agent.epsilon}")
+            print(f"Episode {episode}, Epsilon: {agent.epsilon:.4f}")
     agent.save('trained_agent.pkl')
 
 if __name__ == "__main__":
